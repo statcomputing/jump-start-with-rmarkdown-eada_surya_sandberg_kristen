@@ -1,0 +1,158 @@
+---
+title: "Accuracy of Monte-Carlo Simulation Methods to Estimate Normal Cumulative Distribution Function (CDF)"
+# subtitle: "possible subtitle goes here"
+author:
+  - Kristen Sandberg^[<kristen.sandberg@uconn.edu>; M.S. in Applied Financial Mathematics,
+    Department of Mathematics, University of Connecticut.]
+  - Surya Teja Eada^[<surya.eada@uconn.edu>; M.S. in Applied Financial Mathematics,
+    Department of Mathematics, University of Connecticut.]
+date: "`r format(Sys.time(), '%d %B %Y')`"
+documentclass: article
+papersize: letter
+fontsize: 12pt
+bibliography: template.bib
+biblio-style: datalab
+keywords: Template, R Markdown, bookdown, Data Lab
+# keywords set in YAML header here only go to the properties of the PDF output
+# the keywords that appear in PDF output are set in latex/before_body.tex
+output:
+  #bookdown::pdf_document2
+  bookdown::html_document2
+abstract: |
+    This project intends to utilize the Monte-Carlo simulation techniques for estimation of the Normal Cumulative Distribution Function (CDF) and make inferences based on observation of bias for different values of $t$ and $n$.
+---
+
+
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
+## some utility functions, see the source code for details
+source("utils_template.R")
+
+## specify the packages needed
+pkgs <- c("splines2", "DT", "webshot", "leaflet", "graphics")
+need.packages(pkgs)
+
+## external data can be read in by regular functions,
+## such as read.table or load
+
+## get output format in case something needs extra effort
+outFormat <- knitr::opts_knit$get("rmarkdown.pandoc.to")
+## "latex" or "html"
+
+## for latex and html output
+isHtml <- identical(outFormat, "html")
+isLatex <- identical(outFormat, "latex")
+latex <- ifelse(isLatex, '\\LaTeX\\', 'LaTeX')
+
+## specify global chunk options
+knitr::opts_chunk$set(fig.width = 5, fig.height = 4, dpi = 300,
+                      out.width = "90%", fig.align = "center")
+
+```
+
+
+# Introduction {#sec:intro}
+
+The normal Distribution is one of the most commonly used probability distribution. It has various desirable properties such as central tendency (low entropy), symmetric property, ease of estimating parameters and hypothesis testing, etc. Also the central limit theorem makes it even more useful as averages of random observations from different distributions asymptotically converge to a Normal distribution. Such an important normal distribution has many favourable properites but does not have a closed form for its cumulative distribution function. Normal CDF is the probability that a normally distributed random observation is less than a particular value $t$, and is a function of $t$.
+
+Monte Carlo simulation is one of the ground breaking methods used to estimate various mathematically complex problems in integration by the method of replication of an underlying process. The normal CDF can be estimated using Monte Carlo simulations by generating $n$ normally distributed random observations and observing how many of them are less than the value $t$. Therefore, we use this method with $n \in \{100, 1000, 10000\}$ and illustrate how the standard normal CDF can be estimated for values of $t \in \{0.0, 0.67, 0.84, 1.28, 1.65, 2.32, 2.58, 3.09, 3.72\}$. 
+
+The project also focuses on the calculation of bias values and inferences on changing values of bias with changing values of $n$ and $t$.
+
+# Monte Carlo Estimation of Normal Cumulative Distribution Function {#sec:estimation}
+
+The Normal Cumulative Distribution Function is defined for any value $t$ by the following integration formula \@ref(eq:normal) and is denoted by $\Phi(t)$. The standard normal CDF that we intend to estimate is visualized as the area under the density curve less than a particular value of $t$. For example, the standard normal CDF for $t = 0.67$ is represented in Figure \@ref(fig:cdf)
+
+\begin{align}
+    \Phi(t) = \int_{-\infty}^{t} \dfrac{1}{\sqrt{2\pi}}e^{\frac{-y^2}{2}}dy.
+    (\#eq:normal)
+\end{align}
+
+(ref:cap-cdf) Standard Normal Cumulative Distribution Function at $t = 0.67$.
+
+```{r cdf, echo = TRUE, fig.cap = "(ref:cap-cdf)", fig.width = 8}
+t <- seq(-4, 4, length = 1000)
+density <- dnorm(t, 0, 1)
+plot(t, density, type = "n", xlab = "t", ylab = "Normal Density")
+i <- t <= 0.67
+lines(t,density)
+polygon(c(-Inf, t[i],0.67), c(0,density[i],0), col = "red")
+area <- pnorm(0.67,0,1)
+result <- paste("P(X < 0.67) = ", signif(area, digits = 3))
+mtext(result, 3)
+axis(1, at = seq(40, 160, 20), pos = 0)
+```
+
+\nextline
+
+The above complex integration does not have a closed form solution. However, it can be estimated by simulation of $n$ normally distributed random observations {$X_i$} and finding the proportion of random observations less than $t$. Monte-Carlo estimation is given by the formula \@ref(eq:estimation) and is represented by $\hat{\Phi}$.
+
+\begin{align}
+    \hat{\Phi}(t,n) = \dfrac{1}{n} \sum_{i=1}^{n} I(X_{i} \leq t).
+    (\#eq:estimation)
+\end{align}
+
+Firstly, Monte-Carlo Normal CDF estimate is constructed as a function of $n$ and $t$. In order to replicate the results, a seed of "213" is used. This function  allows us to find the CDF estimated values for any $t$ and $n$. However, for this project, we calculated this for $t \in \{0.0, 0.67, 0.84, 1.28, 1.65, 2.32, 2.58, 3.09, 3.72\}$ using $n \in \{100, 1000, 10000\}$ and constructed the following table \@ref(tab:estimation).
+
+```{r sources, echo = TRUE, message = FALSE, warning = FALSE}
+## Some monte_carlo_cdf functions, see the source code for details
+set.seed(213)
+source("monte_carlo_function_approx_normal_cdf.R")
+source("monte_carlo_function_table.R")
+```
+
+(ref:Estimation) Comparison of Monte-Carlo estimated value and the actual values of Standard Normal CDF at different values of $t$.
+
+```{r estimation, echo = TRUE}
+knitr::kable(monte_carlo_table(), booktabs = TRUE,
+             caption = '(ref:Estimation)')
+```
+
+
+# Estimation Bias {#sec:Bias}
+
+One of the primary concerns in estimation is to verify if the estimator is biased or unbiased. Bias is defined as the difference between the expected value of estimator and the true value, as given in formula \@ref(eq:bias). A statistic is said to be unbiased if the there is zero bias. To find the expected value of the estimator, you have to evaluate the estimator enough to create a sample distribution of the estimator. Therefore, the experiment is repeated 100 times for each value of $t$ and $n$, to detect the sample distribution of the estimate and to infer on the bias. The box plots for sample distribution of the estimator are constructed for all values of $t$ and $n$ in Figure \@ref(fig:Boxplots1).
+
+\begin{align}
+    Bias(\hat{\Phi}(t,n)) = \mathbb{E}(\hat{\Phi}(t,n)) - \Phi(t)
+    (\#eq:bias)
+\end{align}
+
+(ref:cap-Boxplots1) Boxplots to show sample distribution of Monte-Carlo estimator.
+
+```{r Boxplots1, echo = TRUE, fig.cap = "(ref:cap-Boxplots1)", fig.width = 8}
+## some monte_carlo_cdf functions, see the source code for details
+set.seed(213)
+source("monte_carlo_function_100_simulations.R")
+source("monte_carlo_plot_results.R")
+```
+
+Further, the difference between the estimated value and the true value are also calculated for each of the 100 samples and are plotted using box plots to make further inferences. The box plots for bias should be distributed around 0 for unbiased estimators.The box plots for bias of Monte-Carlo simulation estimators of Standard Normal CDF for given values of $t$ and $n$ are visualized in the following figure \@ref(fig:Boxplots2)
+
+(ref:cap-Boxplots2) Boxplots to show sample distribution of Bias.
+
+```{r Boxplots2, echo = TRUE, fig.cap = "(ref:cap-Boxplots1)", fig.width = 8}
+## some monte_carlo_cdf functions, see the source code for details
+source("monte_carlo_bias_box_plot.R")
+```
+
+# Conclusion and Summary {#sec:summary}
+
+In summary, we observed that the monte-carlo simulation provides reasonably accurate estimates for the normal cdf function as seen in \@ref(tab:estimation). Further, the bias of the estimator is distributed around zero. It was also observed that, independent of value $t$, as n increases, the spread of bias decreases. If hypothesis testing has to be done to verify unbiasedness of the monte-carlo estimate for all $t$, larger n will ensure that the estimator is unbiased for all values of $t$. 
+
+It can also be inferred, that for extreme $t$ values, even small values of $n$ will ensure unbiased estimates for normal cdf. The bias spread decreases for larger values of $t$ and is so less, even for small $n$.
+
+# Acknowledgment {-}
+
+We would like to thank Professor Jun Yan for giving this project and Wenjie Wang for having created the template that was really useful in creating this document. 
+
+
+# Reference {-}
+
+
+[pandoc]: http://pandoc.org/
+[pandocManual]: http://pandoc.org/MANUAL.html
+[repo]: https://github.com/wenjie2wang/datalab-templates
+[taskView]: https://cran.r-project.org/web/views/ReproducibleResearch.html
+[shiny.io]: https://www.shinyapps.io/
+[wenjie-stat.shinyapps]: https://wwenjie-stat.shinyapps.io/minisplines2
